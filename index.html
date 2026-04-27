@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة لجنة التدقيق</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen active">
+        <div class="login-container">
+            <div class="logo-placeholder">
+                <div class="logo-icon">📊</div>
+                <h1>نظام إدارة لجنة التدقيق</h1>
+            </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">اسم المستخدم</label>
+                    <input type="text" id="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">كلمة المرور</label>
+                    <input type="password" id="password" required>
+                </div>
+                <div class="form-group">
+                    <label for="role">الدور</label>
+                    <select id="role" required>
+                        <option value="viewer">مطلع (للقراءة فقط)</option>
+                        <option value="admin">مدير (صلاحيات كاملة)</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">تسجيل الدخول</button>
+                <p id="login-error" class="error-message"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="app-screen" class="screen">
+        <header class="main-header">
+            <div class="header-right">
+                <div class="logo-small">📊</div>
+                <h1>نظام إدارة لجنة التدقيق</h1>
+            </div>
+            <div class="header-left">
+                <span id="user-info"></span>
+                <button id="logout-btn" class="btn btn-secondary">تسجيل الخروج</button>
+            </div>
+        </header>
+
+        <nav class="main-nav">
+            <button class="nav-btn active" data-view="dashboard">الرئيسية</button>
+            <button class="nav-btn" data-view="meetings">الاجتماعات</button>
+            <button class="nav-btn" data-view="decisions">القرارات</button>
+            <button class="nav-btn" data-view="members">الأعضاء</button>
+            <button class="nav-btn" data-view="settings">الإعدادات</button>
+        </nav>
+
+        <main class="main-content">
+            <!-- Dashboard View -->
+            <section id="dashboard-view" class="view active">
+                <h2>لوحة المعلومات</h2>
+                <div class="kpi-container">
+                    <div class="kpi-card kpi-total">
+                        <span class="kpi-value" id="kpi-total">0</span>
+                        <span class="kpi-label">إجمالي القرارات</span>
+                    </div>
+                    <div class="kpi-card kpi-implemented">
+                        <span class="kpi-value" id="kpi-implemented">0</span>
+                        <span class="kpi-label">منفذة</span>
+                    </div>
+                    <div class="kpi-card kpi-progress">
+                        <span class="kpi-value" id="kpi-progress">0</span>
+                        <span class="kpi-label">قيد التنفيذ</span>
+                    </div>
+                    <div class="kpi-card kpi-overdue">
+                        <span class="kpi-value" id="kpi-overdue">0</span>
+                        <span class="kpi-label">متأخرة</span>
+                    </div>
+                </div>
+
+                <div class="filters-section">
+                    <div class="search-bar">
+                        <input type="text" id="dashboard-search" placeholder="بحث في القرارات...">
+                    </div>
+                    <div class="filter-controls">
+                        <select id="filter-status">
+                            <option value="">جميع الحالات</option>
+                            <option value="pending">معلقة</option>
+                            <option value="in_progress">قيد التنفيذ</option>
+                            <option value="implemented">منفذة</option>
+                        </select>
+                        <select id="filter-party">
+                            <option value="">جميع الأطراف المسؤولة</option>
+                        </select>
+                        <input type="date" id="filter-date-from" placeholder="من تاريخ">
+                        <input type="date" id="filter-date-to" placeholder="إلى تاريخ">
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table id="decisions-table">
+                        <thead>
+                            <tr>
+                                <th>رقم القرار</th>
+                                <th>نص القرار</th>
+                                <th>الطرف المسؤول</th>
+                                <th>تاريخ الاستحقاق</th>
+                                <th>الحالة</th>
+                                <th>الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Meetings View -->
+            <section id="meetings-view" class="view">
+                <div class="view-header">
+                    <h2>إدارة الاجتماعات</h2>
+                    <button id="add-meeting-btn" class="btn btn-primary">+ اجتماع جديد</button>
+                </div>
+                <div class="table-container">
+                    <table id="meetings-table">
+                        <thead>
+                            <tr>
+                                <th>رقم الاجتماع</th>
+                                <th>التاريخ</th>
+                                <th>المكان</th>
+                                <th>الرئيس</th>
+                                <th>السكرتير</th>
+                                <th>الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Decisions View -->
+            <section id="decisions-view" class="view">
+                <div class="view-header">
+                    <h2>إدارة القرارات</h2>
+                    <button id="add-decision-btn" class="btn btn-primary">+ قرار جديد</button>
+                </div>
+                <div class="table-container">
+                    <table id="all-decisions-table">
+                        <thead>
+                            <tr>
+                                <th>رقم القرار</th>
+                                <th>نص القرار</th>
+                                <th>الطرف المسؤول</th>
+                                <th>تاريخ الاستحقاق</th>
+                                <th>الحالة</th>
+                                <th>الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Members View -->
+            <section id="members-view" class="view">
+                <div class="view-header">
+                    <h2>إدارة الأعضاء</h2>
+                    <button id="add-member-btn" class="btn btn-primary">+ عضو جديد</button>
+                </div>
+                <div class="table-container">
+                    <table id="members-table">
+                        <thead>
+                            <tr>
+                                <th>الاسم</th>
+                                <th>الدور</th>
+                                <th>البريد الإلكتروني</th>
+                                <th>الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Settings View -->
+            <section id="settings-view" class="view">
+                <h2>الإعدادات</h2>
+                <div class="settings-section">
+                    <h3>إعدادات الذكاء الاصطناعي</h3>
+                    <div class="form-group">
+                        <label for="claude-api-key">مفتاح Anthropic API</label>
+                        <input type="password" id="claude-api-key" placeholder="أدخل مفتاح API">
+                        <button id="save-api-key" class="btn btn-secondary">حفظ</button>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h3>معلومات النظام</h3>
+                    <p>نوع قاعدة البيانات: <span id="db-type-display"></span></p>
+                    <p>حالة الاتصال: <span id="connection-status"></span></p>
+                </div>
+            </section>
+        </main>
+
+        <!-- AI Panel -->
+        <div id="ai-panel" class="ai-panel hidden">
+            <div class="ai-panel-header">
+                <h3>✨ تحسين بالذكاء الاصطناعي</h3>
+                <button id="close-ai-panel" class="btn-close">×</button>
+            </div>
+            <div class="ai-panel-content">
+                <textarea id="ai-input-text" placeholder="أدخل نص القرار لتحسينه..."></textarea>
+                <button id="ai-improve-btn" class="btn btn-primary">تحسين النص</button>
+                <div id="ai-result" class="ai-result"></div>
+            </div>
+        </div>
+
+        <!-- Floating AI Button -->
+        <button id="ai-float-btn" class="ai-float-btn">✨ تحسين بالذكاء الاصطناعي</button>
+    </div>
+
+    <!-- Modal for Forms -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title"></h3>
+                <button id="modal-close" class="btn-close">×</button>
+            </div>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/data-adapter.js"></script>
+    <script src="js/local-storage-adapter.js"></script>
+    <script src="js/google-sheets-adapter.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/word-generator.js"></script>
+    <script src="js/ai-helper.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
