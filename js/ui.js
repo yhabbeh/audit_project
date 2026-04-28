@@ -298,12 +298,24 @@ class UIManager {
                 `;
 
             case 'decision':
+                const meetings = data.meetings || [];
                 return `
                     <form id="entity-form" class="entity-form">
                         <input type="hidden" name="id" value="${data.id || ''}">
                         <div class="form-group">
                             <label for="decision_number">رقم القرار *</label>
                             <input type="text" id="decision_number" name="decision_number" required value="${data.decision_number || ''}" ${data.id ? 'readonly' : ''}>
+                        </div>
+                        <div class="form-group">
+                            <label for="meeting_id">الاجتماع المرتبط</label>
+                            <select id="meeting_id" name="meeting_id">
+                                <option value="">غير مرتبط باجتماع محدد</option>
+                                ${meetings.map(m => `
+                                    <option value="${m.id}" ${data.meeting_id === m.id ? 'selected' : ''}>
+                                        ${m.meeting_number} - ${formatDateArabic(m.date)}
+                                    </option>
+                                `).join('')}
+                            </select>
                         </div>
                         <div class="form-group">
                             <label for="decision_text">نص القرار *</label>
@@ -351,6 +363,65 @@ class UIManager {
                         <div class="form-group">
                             <label for="email">البريد الإلكتروني *</label>
                             <input type="email" id="email" name="email" required value="${data.email || ''}">
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">حفظ</button>
+                            <button type="button" class="btn btn-secondary" onclick="uiManager.hideModal()">إلغاء</button>
+                        </div>
+                    </form>
+                `;
+
+            case 'agenda_item':
+                return `
+                    <form id="entity-form" class="entity-form">
+                        <input type="hidden" name="id" value="${data.id || ''}">
+                        <input type="hidden" name="meeting_id" value="${data.meeting_id || ''}">
+                        <div class="form-group">
+                            <label for="subject">الموضوع *</label>
+                            <input type="text" id="subject" name="subject" required value="${data.subject || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label for="presenter">المقدم *</label>
+                            <input type="text" id="presenter" name="presenter" required value="${data.presenter || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label for="type">النوع *</label>
+                            <select id="type" name="type" required>
+                                <option value="decision" ${data.type === 'decision' ? 'selected' : ''}>قرار</option>
+                                <option value="informational" ${data.type === 'informational' ? 'selected' : ''}>معلوماتي</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">حفظ</button>
+                            <button type="button" class="btn btn-secondary" onclick="uiManager.hideModal()">إلغاء</button>
+                        </div>
+                    </form>
+                `;
+
+            case 'attendee':
+                const allMembers = data.members || [];
+                return `
+                    <form id="entity-form" class="entity-form">
+                        <input type="hidden" name="id" value="${data.id || ''}">
+                        <input type="hidden" name="meeting_id" value="${data.meeting_id || ''}">
+                        <div class="form-group">
+                            <label for="member_id">العضو *</label>
+                            <select id="member_id" name="member_id" required>
+                                <option value="">اختر العضو...</option>
+                                ${allMembers.map(m => `
+                                    <option value="${m.id}" ${data.member_id === m.id ? 'selected' : ''}>
+                                        ${m.name} (${m.role})
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="status">حالة الحضور *</label>
+                            <select id="status" name="status" required>
+                                <option value="present" ${data.status === 'present' ? 'selected' : ''}>حاضر</option>
+                                <option value="absent" ${data.status === 'absent' ? 'selected' : ''}>غائب</option>
+                                <option value="excused" ${data.status === 'excused' ? 'selected' : ''}>معتذر</option>
+                            </select>
                         </div>
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary">حفظ</button>

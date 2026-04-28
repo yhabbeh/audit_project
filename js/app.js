@@ -104,6 +104,8 @@ function setupEventListeners() {
             if (modalTitle.includes('اجتماع')) type = 'meeting';
             else if (modalTitle.includes('قرار')) type = 'decision';
             else if (modalTitle.includes('عضو')) type = 'member';
+            else if (modalTitle.includes('بند')) type = 'agenda_item';
+            else if (modalTitle.includes('حاضر')) type = 'attendee';
             
             if (type) {
                 handleFormSubmit(e, type);
@@ -274,7 +276,7 @@ async function loadMembers() {
 /**
  * Show add modal
  */
-function showAddModal(type) {
+async function showAddModal(type, extraData = {}) {
     if (!authManager.isAdmin()) {
         uiManager.showToast('ليس لديك صلاحية الإضافة', 'error');
         return;
@@ -283,14 +285,29 @@ function showAddModal(type) {
     const titles = {
         meeting: 'إضافة اجتماع جديد',
         decision: 'إضافة قرار جديد',
-        member: 'إضافة عضو جديد'
+        member: 'إضافة عضو جديد',
+        agenda_item: 'إضافة بند جدول أعمال',
+        attendee: 'إضافة حاضر'
     };
 
-    uiManager.showModal(titles[type], uiManager.getFormHTML(type));
+    const formData = { ...extraData };
 
-    // Generate decision number if adding decision
-    if (type === 'decision') {
-        generateDecisionNumber();
+    try {
+        if (type === 'decision') {
+            formData.meetings = await db.getAll('meetings');
+        } else if (type === 'attendee') {
+            formData.members = await db.getAll('members');
+        }
+
+        uiManager.showModal(titles[type], uiManager.getFormHTML(type, formData));
+
+        // Generate decision number if adding decision
+        if (type === 'decision') {
+            generateDecisionNumber();
+        }
+    } catch (error) {
+        console.error('Failed to prepare add modal:', error);
+        uiManager.showToast('فشل تحميل بيانات النموذج', 'error');
     }
 }
 
@@ -306,13 +323,23 @@ async function showEditModal(type, id) {
     const titles = {
         meeting: 'تعديل اجتماع',
         decision: 'تعديل قرار',
-        member: 'تعديل عضو'
+        member: 'تعديل عضو',
+        agenda_item: 'تعديل بند جدول أعمال',
+        attendee: 'تعديل حاضر'
     };
 
     try {
         const data = await db.getById(type, id);
+        
+        if (type === 'decision') {
+            data.meetings = await db.getAll('meetings');
+        } else if (type === 'attendee') {
+            data.members = await db.getAll('members');
+        }
+
         uiManager.showModal(titles[type], uiManager.getFormHTML(type, data));
     } catch (error) {
+        console.error('Failed to load data for edit:', error);
         uiManager.showToast('فشل تحميل البيانات', 'error');
     }
 }
@@ -409,7 +436,13 @@ async function handleFormSubmit(e, type) {
         }
 
         uiManager.hideModal();
-        loadViewData(uiManager.currentView);
+        
+        // If we saved an item that belongs to a meeting, and we were in meeting view, refresh it
+        if (data.meeting_id && (type === 'agenda_item' || type === 'attendee' || type === 'decision')) {
+            await viewMeeting(data.meeting_id);
+        } else {
+            loadViewData(uiManager.currentView);
+        }
 
     } catch (error) {
         console.error('Failed to save:', error);
@@ -432,6 +465,8 @@ async function handleDelete(type, id) {
 
     try {
         const oldData = await db.getById(type, id);
+        const meetingId = oldData.meeting_id;
+        
         await db.delete(type, id);
         await db.logAudit(
             authManager.getUser().username,
@@ -442,7 +477,12 @@ async function handleDelete(type, id) {
             null
         );
         uiManager.showToast('تم الحذف بنجاح', 'success');
-        loadViewData(uiManager.currentView);
+        
+        if (meetingId && (type === 'agenda_item' || type === 'attendee')) {
+            await viewMeeting(meetingId);
+        } else {
+            loadViewData(uiManager.currentView);
+        }
     } catch (error) {
         uiManager.showToast('فشل الحذف: ' + error.message, 'error');
     }
@@ -532,17 +572,143 @@ function handleMeetingsTableClick(e) {
 async function viewMeeting(id) {
     try {
         const meeting = await db.getById('meeting', id);
-        const content = `
+        const attendees = await db.query('attendees', { meeting_id: id });
+        const agendaItems = await db.query('agenda_items', { meeting_id: id });
+        const decisions = await db.query('decisions', { meeting_id: id });
+        const allMembers = await db.getAll('members');
+
+        let content = `
             <div class="view-detail">
-                <p><strong>رقم الاجتماع:</strong> ${meeting.meeting_number || ''}</p>
-                <p><strong>التاريخ:</strong> ${formatDateArabic(meeting.date)}</p>
-                <p><strong>المكان:</strong> ${meeting.location || ''}</p>
-                <p><strong>الرئيس:</strong> ${meeting.chairperson || ''}</p>
-                <p><strong>السكرتير:</strong> ${meeting.secretary || ''}</p>
+                <div class="detail-section">
+                    <h4>بيانات الاجتماع</h4>
+                    <p><strong>رقم الاجتماع:</strong> ${meeting.meeting_number || ''}</p>
+                    <p><strong>التاريخ:</strong> ${formatDateArabic(meeting.date)}</p>
+                    <p><strong>المكان:</strong> ${meeting.location || ''}</p>
+                    <p><strong>الرئيس:</strong> ${meeting.chairperson || ''}</p>
+                    <p><strong>السكرتير:</strong> ${meeting.secretary || ''}</p>
+                </div>
+
+                <div class="detail-section">
+                    <div class="section-header">
+                        <h4>الحضور</h4>
+                        ${authManager.isAdmin() ? `<button class="btn btn-small btn-primary add-attendee-sub" data-meeting-id="${id}">+ إضافة حاضر</button>` : ''}
+                    </div>
+                    <table class="sub-table">
+                        <thead>
+                            <tr>
+                                <th>العضو</th>
+                                <th>الحالة</th>
+                                ${authManager.isAdmin() ? '<th>الإجراءات</th>' : ''}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${attendees.length === 0 ? '<tr><td colspan="3" style="text-align:center;">لا يوجد حضور مسجل</td></tr>' : 
+                                attendees.map(att => {
+                                    const member = allMembers.find(m => m.id === att.member_id) || { name: 'عضو غير معروف' };
+                                    return `
+                                        <tr>
+                                            <td>${member.name}</td>
+                                            <td>${getAttendanceLabel(att.status)}</td>
+                                            ${authManager.isAdmin() ? `
+                                                <td>
+                                                    <button class="btn btn-small btn-secondary edit-attendee-sub" data-id="${att.id}">تعديل</button>
+                                                    <button class="btn btn-small btn-danger delete-attendee-sub" data-id="${att.id}">حذف</button>
+                                                </td>
+                                            ` : ''}
+                                        </tr>
+                                    `;
+                                }).join('')
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="detail-section">
+                    <div class="section-header">
+                        <h4>جدول الأعمال</h4>
+                        ${authManager.isAdmin() ? `<button class="btn btn-small btn-primary add-agenda-sub" data-meeting-id="${id}">+ إضافة بند</button>` : ''}
+                    </div>
+                    <table class="sub-table">
+                        <thead>
+                            <tr>
+                                <th>الموضوع</th>
+                                <th>المقدم</th>
+                                <th>النوع</th>
+                                ${authManager.isAdmin() ? '<th>الإجراءات</th>' : ''}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${agendaItems.length === 0 ? '<tr><td colspan="4" style="text-align:center;">لا توجد بنود</td></tr>' : 
+                                agendaItems.map(item => `
+                                    <tr>
+                                        <td>${item.subject}</td>
+                                        <td>${item.presenter}</td>
+                                        <td>${item.type === 'decision' ? 'قرار' : 'معلوماتي'}</td>
+                                        ${authManager.isAdmin() ? `
+                                            <td>
+                                                <button class="btn btn-small btn-secondary edit-agenda-sub" data-id="${item.id}">تعديل</button>
+                                                <button class="btn btn-small btn-danger delete-agenda-sub" data-id="${item.id}">حذف</button>
+                                            </td>
+                                        ` : ''}
+                                    </tr>
+                                `).join('')
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="detail-section">
+                    <div class="section-header">
+                        <h4>القرارات المتخذة</h4>
+                        ${authManager.isAdmin() ? `<button class="btn btn-small btn-primary add-decision-sub" data-meeting-id="${id}">+ إضافة قرار</button>` : ''}
+                    </div>
+                    <table class="sub-table">
+                        <thead>
+                            <tr>
+                                <th>رقم القرار</th>
+                                <th>النص</th>
+                                <th>الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${decisions.length === 0 ? '<tr><td colspan="3" style="text-align:center;">لا توجد قرارات مرتبطة بهذا الاجتماع</td></tr>' : 
+                                decisions.map(d => `
+                                    <tr>
+                                        <td>${d.decision_number}</td>
+                                        <td>${d.decision_text}</td>
+                                        <td>${getStatusLabel(d.status)}</td>
+                                    </tr>
+                                `).join('')
+                            }
+                        </tbody>
+                    </table>
+                </div>
             </div>
         `;
         uiManager.showModal('تفاصيل الاجتماع', content);
+        
+        // Add listeners for sub-actions
+        if (authManager.isAdmin()) {
+            document.querySelector('.add-attendee-sub').onclick = () => showAddModal('attendee', { meeting_id: id });
+            document.querySelector('.add-agenda-sub').onclick = () => showAddModal('agenda_item', { meeting_id: id });
+            document.querySelector('.add-decision-sub').onclick = () => showAddModal('decision', { meeting_id: id });
+            
+            document.querySelectorAll('.edit-attendee-sub').forEach(btn => {
+                btn.onclick = () => showEditModal('attendee', btn.dataset.id);
+            });
+            document.querySelectorAll('.delete-attendee-sub').forEach(btn => {
+                btn.onclick = () => handleDelete('attendee', btn.dataset.id);
+            });
+            
+            document.querySelectorAll('.edit-agenda-sub').forEach(btn => {
+                btn.onclick = () => showEditModal('agenda_item', btn.dataset.id);
+            });
+            document.querySelectorAll('.delete-agenda-sub').forEach(btn => {
+                btn.onclick = () => handleDelete('agenda_item', btn.dataset.id);
+            });
+        }
     } catch (error) {
+        console.error('Failed to view meeting:', error);
         uiManager.showToast('فشل تحميل التفاصيل', 'error');
     }
 }
@@ -556,8 +722,8 @@ async function generateMinutes(meetingId) {
         const attendees = await db.query('attendees', { meeting_id: meetingId });
         const agendaItems = await db.query('agenda_items', { meeting_id: meetingId });
         
-        // Get decisions for this meeting (we'd need meeting_id in decisions for full implementation)
-        const decisions = await db.getAll('decisions');
+        // Get decisions for this meeting
+        const decisions = await db.query('decisions', { meeting_id: meetingId });
         
         await wordGenerator.generateMeetingMinutes(meeting, attendees, agendaItems, decisions);
         uiManager.showToast('تم توليد المحضر بنجاح', 'success');
